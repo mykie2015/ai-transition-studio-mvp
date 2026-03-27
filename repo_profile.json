@@ -7,6 +7,7 @@
   "typecheck_cmd": "npx tsc --noEmit -p tsconfig.app.json",
   "build_cmd": "npm run build",
   "docker_image": null,
+  "skip_evaluator": true,
   "codex_flags": "--full-auto",
   "evaluation_criteria": {
     "feature_completeness": {
