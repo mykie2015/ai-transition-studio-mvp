@@ -1,0 +1,128 @@
+.panel {
+  background: #ffffff;
+  border: 1px solid #d7dcea;
+  border-radius: 14px;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.header {
+  align-items: start;
+  border-bottom: 1px solid #e3e7f2;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-bottom: 0.85rem;
+}
+
+.title {
+  color: #1a2638;
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.subtitle {
+  color: #56627c;
+  font-size: 0.88rem;
+  margin: 0.35rem 0 0;
+  max-width: 64ch;
+}
+
+.scoreWrap {
+  background: #f4f7ff;
+  border: 1px solid #d6e1fd;
+  border-radius: 10px;
+  min-width: 130px;
+  padding: 0.45rem 0.6rem;
+  text-align: right;
+}
+
+.scoreLabel {
+  color: #53658c;
+  font-size: 0.73rem;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.scoreValue {
+  color: #1b3768;
+  font-size: 1.2rem;
+  font-weight: 650;
+  margin: 0.1rem 0 0;
+}
+
+.form {
+  display: grid;
+  gap: 0.78rem;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.field {
+  color: #1e2c45;
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 600;
+  gap: 0.32rem;
+}
+
+.field input,
+.field textarea {
+  background: #fcfdff;
+  border: 1px solid #cfd7e7;
+  border-radius: 10px;
+  color: #12213a;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 450;
+  line-height: 1.4;
+  padding: 0.56rem 0.66rem;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: #5f85d5;
+  box-shadow: 0 0 0 3px rgba(95, 133, 213, 0.18);
+  outline: none;
+}
+
+.textareaField {
+  grid-column: 1 / -1;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submitButton {
+  background: #1f3f72;
+  border: 1px solid #1a3562;
+  border-radius: 10px;
+  color: #eff5ff;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.56rem 0.92rem;
+}
+
+.submitButton:hover {
+  background: #274b86;
+}
+
+.submitButton:disabled {
+  background: #8a95ad;
+  border-color: #8a95ad;
+  cursor: not-allowed;
+}
+
+@media (max-width: 920px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
+}
