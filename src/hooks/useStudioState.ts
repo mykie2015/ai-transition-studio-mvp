@@ -244,12 +244,14 @@ export function useStudioState() {
   const generateDraftFromEvidence = async (input: EvidenceDraftInput) => {
     setAnalysisNotes(input.notes)
 
-    const artifacts = defaultDraft.artifacts.map((artifact) => ({
-      id: artifact.id,
-      type: artifact.artifactType,
-      title: artifact.title,
-      content: artifact.rawText,
-    }))
+    const artifacts = input.artifacts
+      .filter((artifact) => artifact.content.trim().length > 0)
+      .map((artifact) => ({
+        id: artifact.id,
+        type: artifact.type,
+        title: artifact.title,
+        content: artifact.content,
+      }))
 
     if (input.notes.trim().length > 0) {
       artifacts.push({
