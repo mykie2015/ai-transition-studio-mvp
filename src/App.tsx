@@ -1,15 +1,62 @@
-import DraftSummary from './components/DraftSummary'
+import { useMemo, useState } from 'react'
 import EvidenceIntake from './components/EvidenceIntake'
 import ResultsBrief from './components/ResultsBrief'
-import ReviewQueue from './components/ReviewQueue'
+import ReviewSummaryPanel from './components/ReviewSummaryPanel'
 import ScenarioSimulator from './components/ScenarioSimulator'
 import StudioShell from './components/StudioShell'
 import WorkflowCanvas from './components/WorkflowCanvas'
+import WorkflowInspectorPanel from './components/WorkflowInspectorPanel'
+import WorkflowRightRail from './components/WorkflowRightRail'
 import { useStudioState } from './hooks/useStudioState'
 import './App.css'
 
 function App() {
   const studio = useStudioState()
+  const [selection, setSelection] = useState<{ kind: 'step' | 'edge'; id: string } | null>(null)
+
+  const compactRailMetrics = useMemo(
+    () =>
+      studio.heroStats.filter((stat) =>
+        ['story-points', 'cycle-point', 'cost-point'].includes(stat.id),
+      ),
+    [studio.heroStats],
+  )
+
+  const defaultStepId =
+    studio.currentDraft
+      ? studio.reviewQueue.find((item) => item.stepId)?.stepId ?? studio.currentDraft.steps[0]?.id ?? null
+      : null
+
+  const selectionIsValid =
+    selection && studio.currentDraft
+      ? selection.kind === 'step'
+        ? studio.currentDraft.steps.some((step) => step.id === selection.id)
+        : studio.currentDraft.edges.some((edge) => edge.id === selection.id)
+      : false
+
+  const selectedStepId =
+    !studio.currentDraft
+      ? null
+      : selectionIsValid
+        ? selection?.kind === 'step'
+          ? selection.id
+          : null
+        : defaultStepId
+
+  const selectedEdgeId =
+    !studio.currentDraft
+      ? null
+      : selectionIsValid && selection?.kind === 'edge'
+        ? selection.id
+        : null
+
+  const handleSelectStep = (stepId: string) => {
+    setSelection({ kind: 'step', id: stepId })
+  }
+
+  const handleSelectEdge = (edgeId: string) => {
+    setSelection({ kind: 'edge', id: edgeId })
+  }
 
   const renderStage = () => {
     if (studio.activeStage === 'context') {
@@ -17,11 +64,11 @@ function App() {
         <div className="app-stageStack">
           <section className="app-introCard">
             <p className="app-eyebrow">Workflow Draft Studio</p>
-            <h2>Turn evidence into a draft delivery workflow before debating automation.</h2>
+            <h2>Turn one reviewed evidence bundle into a draft delivery workflow.</h2>
             <p>
-              Start from repo docs, tracker exports, and review policy evidence. The app drafts the
-              agile delivery flow, then pushes you into guided review before it recommends an
-              automation path.
+              Start from the strict markdown template. Upload repo docs, tracker summary, tool
+              manifest, review policy, and validation policy as one controlled bundle, then confirm
+              the extracted sections before any workflow draft is generated.
             </p>
           </section>
 
@@ -41,10 +88,21 @@ function App() {
     if (studio.activeStage === 'workflow') {
       return (
         <div className="app-stageStack">
-          <DraftSummary draft={studio.currentDraft} />
-          <div className="app-reviewGrid">
-            <ReviewQueue items={studio.reviewQueue} />
-            <WorkflowCanvas draft={studio.currentDraft} />
+          <WorkflowCanvas
+            draft={studio.currentDraft}
+            selectedStepId={selectedStepId}
+            selectedEdgeId={selectedEdgeId}
+            onSelectStep={handleSelectStep}
+            onSelectEdge={handleSelectEdge}
+          />
+
+          <div className="app-detailBand">
+            <ReviewSummaryPanel draft={studio.currentDraft} reviewQueue={studio.reviewQueue} />
+            <WorkflowInspectorPanel
+              draft={studio.currentDraft}
+              selectedStepId={selectedStepId}
+              selectedEdgeId={selectedEdgeId}
+            />
           </div>
         </div>
       )
@@ -53,8 +111,28 @@ function App() {
     if (studio.activeStage === 'analysis') {
       return (
         <div className="app-stageStack">
-          <DraftSummary draft={studio.currentDraft} />
-          <WorkflowCanvas draft={studio.currentDraft} />
+          <WorkflowCanvas
+            draft={studio.currentDraft}
+            selectedStepId={selectedStepId}
+            selectedEdgeId={selectedEdgeId}
+            onSelectStep={handleSelectStep}
+            onSelectEdge={handleSelectEdge}
+          />
+
+          <div className="app-detailBand">
+            <ReviewSummaryPanel
+              draft={studio.currentDraft}
+              reviewQueue={studio.reviewQueue}
+              mode="analysis"
+              selectedResult={studio.selectedStrategyResult}
+            />
+            <WorkflowInspectorPanel
+              draft={studio.currentDraft}
+              selectedStepId={selectedStepId}
+              selectedEdgeId={selectedEdgeId}
+            />
+          </div>
+
           <ScenarioSimulator
             baseline={studio.baseline}
             results={studio.strategyResults}
@@ -87,14 +165,27 @@ function App() {
             <div className="app-listStack">
               <p>Repo docs and contribution guides</p>
               <p>Tracker exports with story points</p>
-              <p>Review and validation policy notes</p>
+              <p>Tool manifests, review policy, and validation policy</p>
             </div>
           </section>
           <section className="app-sideCard">
             <p className="app-sideLabel">Operator Note</p>
-            <p>{studio.analysisNotes || 'Add pasted notes if your review policy differs from the default example.'}</p>
+            <p>{studio.analysisNotes || 'The uploaded bundle can carry optional operator notes for the first draft.'}</p>
           </section>
         </div>
+      )
+    }
+
+    if (studio.currentDraft && (studio.activeStage === 'workflow' || studio.activeStage === 'analysis')) {
+      return (
+        <WorkflowRightRail
+          workflowName={studio.currentDraft.workflowName}
+          metrics={compactRailMetrics}
+          reviewQueue={studio.reviewQueue}
+          traceLinks={studio.traceLinks}
+          bottlenecks={studio.bottlenecks}
+          recommendedPilot={studio.diagnosis.recommendedPilot}
+        />
       )
     }
 

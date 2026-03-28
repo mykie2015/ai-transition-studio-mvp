@@ -1,0 +1,105 @@
+.panel {
+  background: #ffffff;
+  border: 1px solid #d8e1ec;
+  border-radius: 22px;
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.header {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.eyebrow,
+.label {
+  color: #6b7280;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.title,
+.value,
+.body,
+.traceTitle {
+  margin: 0;
+}
+
+.title {
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 1.2rem;
+}
+
+.statePill {
+  background: #fff7ed;
+  border: 1px solid #f4c58b;
+  border-radius: 999px;
+  color: #9a4d07;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.35rem 0.7rem;
+  text-transform: capitalize;
+}
+
+.grid,
+.detailGrid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.detailGrid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.card,
+.detailCard,
+.traceCard {
+  background: #f8fafc;
+  border: 1px solid #d8e1ec;
+  border-radius: 18px;
+  padding: 0.9rem;
+}
+
+.value {
+  color: #13233a;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.body {
+  color: #455468;
+  line-height: 1.6;
+}
+
+.traceList {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.traceItem {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.75rem;
+}
+
+.traceItem:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.traceTitle {
+  color: #10203a;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}

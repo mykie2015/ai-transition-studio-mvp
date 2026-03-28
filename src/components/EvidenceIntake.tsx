@@ -1,18 +1,18 @@
-import { useState } from 'react'
-import type { EvidenceArtifact, EvidenceArtifactType } from '../types/studio'
+import { useMemo, useState } from 'react'
+import { buildWorkflowBundleTemplate, parseWorkflowBundleTemplate } from '../lib/workflowBundle'
+import type { EvidenceArtifact } from '../types/studio'
 import styles from './EvidenceIntake.module.css'
-
-interface EvidenceDraftArtifact {
-  id: string
-  type: EvidenceArtifactType
-  title: string
-  content: string
-}
 
 export interface EvidenceDraftInput {
   workflowName: string
-  notes: string
-  artifacts: EvidenceDraftArtifact[]
+  sections: {
+    repoDocs: string
+    trackerExport: string
+    toolManifest: string
+    reviewPolicy: string
+    validationPolicy: string
+    operatorNotes: string
+  }
 }
 
 interface EvidenceIntakeProps {
@@ -21,65 +21,116 @@ interface EvidenceIntakeProps {
   onGenerateDraft: (input: EvidenceDraftInput) => void | Promise<void>
 }
 
+const sectionCards = [
+  {
+    key: 'repoDocs',
+    title: 'Repo Docs Summary',
+    description: 'README, contribution guides, coding rules, and engineering conventions.',
+  },
+  {
+    key: 'trackerExport',
+    title: 'Tracker Export Summary',
+    description: 'Story scope, acceptance criteria, owners, and story points from Jira.',
+  },
+  {
+    key: 'toolManifest',
+    title: 'Tool Manifest Summary',
+    description: 'Tools, platforms, and automation surfaces available to the workflow.',
+  },
+  {
+    key: 'reviewPolicy',
+    title: 'Review Policy',
+    description: 'PR review gate, severity threshold, and remediation expectation.',
+  },
+  {
+    key: 'validationPolicy',
+    title: 'Validation Policy',
+    description: 'Required validation commands before PR and merge.',
+  },
+  {
+    key: 'operatorNotes',
+    title: 'Operator Notes',
+    description: 'Optional notes that shape the first workflow draft.',
+  },
+] as const
+
+const readBundleFile = async (file: File): Promise<string> => {
+  if (typeof file.text === 'function') {
+    return file.text()
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('Failed to read bundle file'))
+    reader.readAsText(file)
+  })
+}
+
 export default function EvidenceIntake({
   artifacts,
   status,
   onGenerateDraft,
 }: EvidenceIntakeProps) {
-  const buildDraftArtifacts = (): EvidenceDraftArtifact[] => {
-    const findArtifact = (type: EvidenceArtifactType, fallbackTitle: string) => {
-      const artifact = artifacts.find((item) => item.artifactType === type)
+  const [parsedBundle, setParsedBundle] = useState<EvidenceDraftInput | null>(null)
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [uploadedFileName, setUploadedFileName] = useState<string>('')
 
-      return {
-        id: artifact?.id ?? `draft-${type}`,
-        type,
-        title: artifact?.title ?? fallbackTitle,
-        content: artifact?.rawText ?? '',
-      }
+  const templateSummary = useMemo(() => {
+    const existingArtifactCount = artifacts.length
+
+    return existingArtifactCount === 0
+      ? 'Use the strict markdown template to capture the workflow evidence bundle.'
+      : `Current session holds ${existingArtifactCount} draft artifact examples. The uploaded bundle will replace manual entry.`
+  }, [artifacts])
+
+  const downloadTemplate = () => {
+    const template = buildWorkflowBundleTemplate()
+
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return
     }
 
-    return [
-      findArtifact('repo-doc', 'Repository Docs'),
-      findArtifact('tracker-export', 'Tracker Export'),
-      findArtifact('tool-manifest', 'Tool Manifest'),
-    ]
+    const blob = new Blob([template], { type: 'text/markdown;charset=utf-8' })
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = downloadUrl
+    link.download = 'transition-studio-workflow-bundle.md'
+    link.click()
+
+    window.URL.revokeObjectURL(downloadUrl)
   }
 
-  const [workflowName, setWorkflowName] = useState('Agile Story Delivery')
-  const [notes, setNotes] = useState('')
-  const [draftArtifacts, setDraftArtifacts] = useState<EvidenceDraftArtifact[]>(buildDraftArtifacts)
+  const handleBundleFile = async (file: File | null) => {
+    setParseError(null)
+    setParsedBundle(null)
+    setUploadedFileName(file?.name ?? '')
 
-  const updateArtifact = (artifactId: string, field: 'title' | 'content', value: string) => {
-    setDraftArtifacts((current) =>
-      current.map((artifact) =>
-        artifact.id === artifactId
-          ? {
-              ...artifact,
-              [field]: value,
-            }
-          : artifact,
-      ),
-    )
-  }
-
-  const loadArtifactFile = async (artifactId: string, file: File | null) => {
     if (!file) {
       return
     }
 
-    const content = await file.text()
+    try {
+      const content = await readBundleFile(file)
+      const parsed = parseWorkflowBundleTemplate(content)
 
-    setDraftArtifacts((current) =>
-      current.map((artifact) =>
-        artifact.id === artifactId
-          ? {
-              ...artifact,
-              title: file.name,
-              content,
-            }
-          : artifact,
-      ),
-    )
+      setParsedBundle({
+        workflowName: parsed.workflowName,
+        sections: parsed.sections,
+      })
+    } catch (caughtError) {
+      setParseError(caughtError instanceof Error ? caughtError.message : 'Failed to parse bundle file')
+    }
+  }
+
+  const confirmBundle = () => {
+    if (!parsedBundle || status === 'loading') {
+      return
+    }
+
+    void onGenerateDraft(parsedBundle)
   }
 
   return (
@@ -87,101 +138,90 @@ export default function EvidenceIntake({
       <div className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Evidence Intake</p>
-          <h2 className={styles.title}>Upload or paste the workflow evidence you already have.</h2>
+          <h2 className={styles.title}>Load one completed workflow bundle, then review the extracted sections.</h2>
+          <p className={styles.description}>
+            The MVP starts from a strict markdown template so the workflow draft can be traced back
+            to repo docs, tracker exports, validation policy, and review rules without loose
+            inference.
+          </p>
         </div>
-        <button
-          type="button"
-          className={styles.primaryButton}
-          disabled={status === 'loading'}
-          onClick={() =>
-            onGenerateDraft({
-              workflowName,
-              notes,
-              artifacts: draftArtifacts,
-            })
-          }
-        >
-          {status === 'loading' ? 'Generating draft...' : 'Generate Draft'}
+
+        <button type="button" className={styles.secondaryButton} onClick={downloadTemplate}>
+          Download Template
         </button>
       </div>
 
-      <div className={styles.grid}>
-        <label className={styles.field}>
-          <span>Workflow name</span>
-          <input value={workflowName} onChange={(event) => setWorkflowName(event.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span>Notes</span>
-          <textarea
-            rows={4}
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            placeholder="Paste tracker context, repo notes, or review policy details."
+      <section className={styles.uploadCard}>
+        <div className={styles.uploadHeader}>
+          <div>
+            <p className={styles.cardLabel}>Single Bundle File</p>
+            <h3 className={styles.cardTitle}>Upload completed bundle</h3>
+          </div>
+          <p className={styles.cardMeta}>{templateSummary}</p>
+        </div>
+
+        <label className={styles.fileField}>
+          <span>Upload completed bundle</span>
+          <input
+            type="file"
+            accept=".md,text/markdown"
+            aria-label="Upload completed bundle"
+            onChange={(event) => void handleBundleFile(event.target.files?.[0] ?? null)}
           />
         </label>
-      </div>
 
-      <div className={styles.sourceGrid}>
-        {draftArtifacts.map((artifact) => {
-          const sourceLabel =
-            artifact.type === 'repo-doc'
-              ? 'Repo Docs'
-              : artifact.type === 'tracker-export'
-                ? 'Tracker Export'
-                : 'Tool Manifest'
-
-          return (
-            <article key={artifact.id} className={styles.sourceCard}>
-              <div className={styles.sourceHeader}>
-                <div>
-                  <p className={styles.artifactTitle}>{sourceLabel}</p>
-                  <p className={styles.artifactMeta}>{artifact.type}</p>
-                </div>
-                <label className={styles.fileField}>
-                  <span>{sourceLabel} file</span>
-                  <input
-                    type="file"
-                    accept=".txt,.md,.json,.yaml,.yml,.csv"
-                    onChange={(event) => loadArtifactFile(artifact.id, event.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
-
-              <label className={styles.field}>
-                <span>{sourceLabel} title</span>
-                <input
-                  value={artifact.title}
-                  onChange={(event) => updateArtifact(artifact.id, 'title', event.target.value)}
-                />
-              </label>
-
-              <label className={styles.field}>
-                <span>{sourceLabel} content</span>
-                <textarea
-                  rows={7}
-                  value={artifact.content}
-                  onChange={(event) => updateArtifact(artifact.id, 'content', event.target.value)}
-                  placeholder={`Paste ${sourceLabel.toLowerCase()} evidence here.`}
-                />
-              </label>
-            </article>
-          )
-        })}
-      </div>
-
-      <div className={styles.artifactList}>
-        {draftArtifacts.map((artifact) => (
-          <article key={`summary-${artifact.id}`} className={styles.artifactCard}>
-            <p className={styles.artifactTitle}>{artifact.title}</p>
-            <p className={styles.artifactMeta}>{artifact.type}</p>
-            <p className={styles.artifactSummary}>
-              {artifact.content.trim().length === 0
-                ? 'No evidence loaded yet.'
-                : artifact.content.replace(/\s+/g, ' ').trim().slice(0, 160)}
+        <div className={styles.statusRow}>
+          <p className={styles.fileMeta}>
+            {uploadedFileName ? `Loaded: ${uploadedFileName}` : 'Use the app template and keep every section heading unchanged.'}
+          </p>
+          {parseError ? (
+            <p className={styles.errorText} role="alert">
+              {parseError}
             </p>
-          </article>
-        ))}
-      </div>
+          ) : parsedBundle ? (
+            <p className={styles.successText}>Parsed successfully. Review the extracted sections before drafting.</p>
+          ) : (
+            <p className={styles.helperText}>Draft generation stays locked until parsing succeeds and you confirm.</p>
+          )}
+        </div>
+      </section>
+
+      {parsedBundle ? (
+        <section className={styles.reviewBlock} aria-label="Review extracted sections">
+          <div className={styles.reviewHeader}>
+            <div>
+              <p className={styles.cardLabel}>Review extracted sections</p>
+              <h3 className={styles.cardTitle}>{parsedBundle.workflowName || 'Untitled workflow bundle'}</h3>
+            </div>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              disabled={status === 'loading'}
+              onClick={confirmBundle}
+            >
+              {status === 'loading' ? 'Generating draft...' : 'Confirm and generate draft'}
+            </button>
+          </div>
+
+          <div className={styles.reviewGrid}>
+            {sectionCards.map((section) => (
+              <article key={section.key} className={styles.sectionCard}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p className={styles.sectionTitle}>{section.title}</p>
+                    <p className={styles.sectionDescription}>{section.description}</p>
+                  </div>
+                </div>
+                <p className={styles.sectionContent}>
+                  {parsedBundle.sections[section.key].trim().length > 0
+                    ? parsedBundle.sections[section.key]
+                    : 'No content provided.'}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </section>
   )
 }

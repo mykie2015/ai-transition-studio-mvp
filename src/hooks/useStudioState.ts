@@ -242,25 +242,46 @@ export function useStudioState() {
   ]
 
   const generateDraftFromEvidence = async (input: EvidenceDraftInput) => {
-    setAnalysisNotes(input.notes)
+    setAnalysisNotes(input.sections.operatorNotes)
 
-    const artifacts = input.artifacts
-      .filter((artifact) => artifact.content.trim().length > 0)
-      .map((artifact) => ({
-        id: artifact.id,
-        type: artifact.type,
-        title: artifact.title,
-        content: artifact.content,
-      }))
-
-    if (input.notes.trim().length > 0) {
-      artifacts.push({
-        id: 'artifact-pasted-note',
-        type: 'pasted-note',
-        title: 'Pasted Notes',
-        content: input.notes.trim(),
-      })
-    }
+    const artifacts = [
+      {
+        id: 'artifact-repo-docs',
+        type: 'repo-doc' as const,
+        title: 'Repo Docs Summary',
+        content: input.sections.repoDocs,
+      },
+      {
+        id: 'artifact-tracker-export',
+        type: 'tracker-export' as const,
+        title: 'Tracker Export Summary',
+        content: input.sections.trackerExport,
+      },
+      {
+        id: 'artifact-tool-manifest',
+        type: 'tool-manifest' as const,
+        title: 'Tool Manifest Summary',
+        content: input.sections.toolManifest,
+      },
+      {
+        id: 'artifact-review-policy',
+        type: 'review-artifact' as const,
+        title: 'Review Policy',
+        content: input.sections.reviewPolicy,
+      },
+      {
+        id: 'artifact-validation-policy',
+        type: 'validation-artifact' as const,
+        title: 'Validation Policy',
+        content: input.sections.validationPolicy,
+      },
+      {
+        id: 'artifact-operator-notes',
+        type: 'pasted-note' as const,
+        title: 'Operator Notes',
+        content: input.sections.operatorNotes,
+      },
+    ].filter((artifact) => artifact.content.trim().length > 0)
 
     await generateDraft({
       workflowName: input.workflowName,

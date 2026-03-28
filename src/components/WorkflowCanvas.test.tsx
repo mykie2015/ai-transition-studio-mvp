@@ -1,13 +1,28 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { buildDefaultAgileWorkflow } from '../lib/defaultWorkflow'
 import WorkflowCanvas from './WorkflowCanvas'
 
 describe('WorkflowCanvas', () => {
-  it('renders the validation and review loop labels', () => {
-    render(<WorkflowCanvas draft={buildDefaultAgileWorkflow()} />)
+  it('emits step selection when a node is clicked', async () => {
+    const onSelectStep = vi.fn()
+    const onSelectEdge = vi.fn()
+    const user = userEvent.setup()
 
-    expect(screen.getByText(/validation gate/i)).toBeInTheDocument()
-    expect(screen.getByText(/rework loop/i)).toBeInTheDocument()
+    render(
+      <WorkflowCanvas
+        draft={buildDefaultAgileWorkflow()}
+        selectedStepId={null}
+        selectedEdgeId={null}
+        onSelectStep={onSelectStep}
+        onSelectEdge={onSelectEdge}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /capture jira story scope/i }))
+
+    expect(onSelectStep).toHaveBeenCalledWith('jira-scope')
+    expect(onSelectEdge).not.toHaveBeenCalled()
   })
 })
