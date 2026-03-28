@@ -1,0 +1,63 @@
+.panel {
+  background: #f8fafc;
+  border: 1px solid #d8e1ec;
+  border-radius: 18px;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.title,
+.subtitle,
+.legendTitle {
+  margin: 0;
+}
+
+.title {
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 1.2rem;
+}
+
+.subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-top: 0.35rem;
+}
+
+.canvasShell {
+  background: radial-gradient(circle at top, rgba(217, 119, 6, 0.12), transparent 45%), #ffffff;
+  border: 1px solid #d8e1ec;
+  border-radius: 16px;
+  height: 440px;
+  overflow: hidden;
+}
+
+.legendGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.legendCard {
+  background: #ffffff;
+  border: 1px solid #d8e1ec;
+  border-radius: 16px;
+  padding: 0.9rem;
+}
+
+.legendTitle {
+  font-size: 0.95rem;
+}
+
+.list {
+  color: #334155;
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+}

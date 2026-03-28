@@ -1,0 +1,97 @@
+.panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.header {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.eyebrow {
+  color: #8c4c15;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.title {
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 1.45rem;
+  margin: 0;
+}
+
+.primaryButton {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  border: 0;
+  border-radius: 999px;
+  color: #fff8eb;
+  cursor: pointer;
+  font-weight: 700;
+  min-width: 160px;
+  padding: 0.85rem 1.2rem;
+}
+
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field input,
+.field textarea {
+  background: #ffffff;
+  border: 1px solid #d6d8e1;
+  border-radius: 14px;
+  font: inherit;
+  padding: 0.8rem 0.9rem;
+}
+
+.artifactList {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.artifactCard {
+  background: #ffffff;
+  border: 1px solid #d6d8e1;
+  border-radius: 16px;
+  padding: 0.9rem;
+}
+
+.artifactTitle,
+.artifactMeta,
+.artifactSummary {
+  margin: 0;
+}
+
+.artifactTitle {
+  font-weight: 700;
+}
+
+.artifactMeta {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.artifactSummary {
+  color: #2f3b52;
+  font-size: 0.92rem;
+  margin-top: 0.55rem;
+}

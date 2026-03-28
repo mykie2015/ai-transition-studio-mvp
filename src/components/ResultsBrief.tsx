@@ -104,6 +104,19 @@ export default function ResultsBrief({
           <p className={styles.sectionBody}>
             {selectedResult?.strategy.summary ?? 'Select a scenario to generate the recommendation.'}
           </p>
+          {selectedResult ? (
+            <div className={styles.metricStack}>
+              <p className={styles.sectionHint}>
+                Cycle / point: {selectedResult.metrics.cycleTimePerStoryPoint ?? 'n/a'}h
+              </p>
+              <p className={styles.sectionHint}>
+                Cost / point:{' '}
+                {selectedResult.metrics.estimatedCostPerStoryPoint === undefined
+                  ? 'n/a'
+                  : `$${selectedResult.metrics.estimatedCostPerStoryPoint}`}
+              </p>
+            </div>
+          ) : null}
           <p className={styles.sectionHint}>
             {selectedResult?.strategy.id === recommendedStrategyId
               ? 'This matches the current recommended first move.'
@@ -112,7 +125,7 @@ export default function ResultsBrief({
         </article>
 
         <article className={styles.sectionCard}>
-          <p className={styles.sectionLabel}>Attached MCP Context</p>
+          <p className={styles.sectionLabel}>Attached Evidence</p>
           <div className={styles.listStack}>
             {attachedArtifacts.map((artifact) => (
               <div key={artifact.id} className={styles.listItem}>

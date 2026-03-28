@@ -1,490 +1,319 @@
 import { useState } from 'react'
 import type { HeroStat, StudioStage } from '../components/StudioShell'
-import type { ArtifactNormalizationResult } from '../components/McpImportPanel'
-import {
-  demoAssets,
-  demoBaseline,
-  demoBottlenecks,
-  demoMcpImportSamples,
-  demoOrganization,
-  demoSelectedStrategyId,
-  demoStrategies,
-  demoWorkflow,
-} from '../data/demoStudio'
+import type { EvidenceDraftInput } from '../components/EvidenceIntake'
+import { buildDefaultAgileWorkflow } from '../lib/defaultWorkflow'
 import { generateBriefMarkdown } from '../lib/briefExport'
-import { normalizeMcpArtifacts } from '../lib/mcpImport'
 import {
   buildStrategyMetricsTable,
   recommendStrategyId,
   type ScenarioMetricResult,
-  type StrategyOverrides,
 } from '../lib/scenarioMetrics'
+import { useAnalysisSession } from './useAnalysisSession'
 import type {
-  ArtifactSource,
+  AiAsset,
+  AnalysisDraft,
   AutomationMode,
-  ImportedArtifact,
   OrganizationContext,
   StageId,
-  WorkflowContextBundle,
-  WorkflowStep,
+  StrategyScenario,
 } from '../types/studio'
 
 const stageOrder: StageId[] = ['context', 'workflow', 'analysis', 'brief']
+const defaultDraft = buildDefaultAgileWorkflow()
 
-const initialArtifacts = normalizeMcpArtifacts(demoMcpImportSamples)
-const initiallyAttachedArtifactIds = initialArtifacts.slice(0, 3).map((artifact) => artifact.id)
-
-const expectedPayloadFields: Record<ArtifactSource, string[]> = {
-  filesystem: ['path', 'tags', 'metadata'],
-  docs: ['docId', 'url', 'author', 'updatedAt'],
-  tracker: ['key', 'status', 'priority', 'assignee', 'labels'],
+const defaultOrganization: OrganizationContext = {
+  organizationName: 'Transition Studio Demo Team',
+  industry: 'Software Delivery',
+  functionName: 'Engineering',
+  teamSize: 8,
+  painStatement: 'Delivery flow is debated more than it is measured.',
+  targetOutcome: 'Find the first automation path that improves speed without losing review control.',
 }
 
-const pct = (value: number): number => Math.round(value * 100)
+const buildStrategies = (draft: AnalysisDraft): StrategyScenario[] => {
+  const recommendedAutomation = (mode: 'copilot' | 'hybrid' | 'agentic') =>
+    Object.fromEntries(
+      draft.steps.map((step) => {
+        let automationMode: AutomationMode = 'assist-only'
 
-const clamp = (value: number, min: number, max: number): number => {
-  if (value < min) {
-    return min
-  }
-  if (value > max) {
-    return max
-  }
-  return value
-}
+        if (mode === 'copilot') {
+          automationMode =
+            step.id === 'validation-gate' || step.id === 'review-remediation'
+              ? 'automate-with-review'
+              : 'assist-only'
+        } else if (mode === 'hybrid') {
+          automationMode =
+            step.id === 'validation-gate' || step.id === 'review-remediation'
+              ? 'automate-with-review'
+              : step.id === 'pr-open'
+                ? 'assist-only'
+                : 'automate-with-review'
+        } else {
+          automationMode =
+            step.id === 'jira-scope' || step.reviewRequired
+              ? 'automate-with-review'
+              : 'automate-by-default'
+        }
 
-const getContextScore = (context: OrganizationContext): number => {
-  const checks = [
-    context.organizationName.trim().length > 0,
-    context.industry.trim().length > 0,
-    context.functionName.trim().length > 0,
-    context.teamSize > 0,
-    context.painStatement.trim().length > 0,
-    context.targetOutcome.trim().length > 0,
+        return [step.id, automationMode]
+      }),
+    ) as Record<string, AutomationMode>
+
+  return [
+    {
+      id: 'copilot',
+      title: 'Conservative Copilot',
+      mode: 'copilot',
+      summary: 'Draft faster, but keep humans explicitly steering every delivery checkpoint.',
+      coverageLabel: 'assist-first',
+      recommendedAutomation: recommendedAutomation('copilot'),
+      risks: ['Speed gains can flatten if reviewers become the new bottleneck.'],
+      prerequisites: ['Clear review ownership', 'Documented acceptance criteria'],
+      requiredChange: 'Adopt AI drafting for planning, coding, and PR summaries without changing merge control.',
+    },
+    {
+      id: 'hybrid',
+      title: 'Hybrid Workflow Redesign',
+      mode: 'hybrid',
+      summary: 'Automate repeatable delivery steps while preserving guided review on risky gates.',
+      coverageLabel: 'review-gated',
+      recommendedAutomation: recommendedAutomation('hybrid'),
+      risks: ['Validation and remediation loops still need careful exception handling.'],
+      prerequisites: ['Stable validation stack', 'Clear blocking severity policy'],
+      requiredChange: 'Move validation and remediation into guided automation with explicit reviewer checkpoints.',
+    },
+    {
+      id: 'agentic',
+      title: 'Agentic Service Pipeline',
+      mode: 'agentic',
+      summary: 'Push proven low-variance steps toward AI-first execution with escalations for risky work.',
+      coverageLabel: 'automation-heavy',
+      recommendedAutomation: recommendedAutomation('agentic'),
+      risks: ['Over-automation can hide weak evidence or ambiguous requirements.'],
+      prerequisites: ['Strong guardrails', 'Reliable rollback path', 'Tooling telemetry'],
+      requiredChange: 'Promote stable validation and PR handoffs into AI-first defaults with human escalation paths.',
+    },
   ]
-  return pct(checks.filter(Boolean).length / checks.length)
 }
 
-const getWorkflowReadiness = (workflow: WorkflowStep[]): number => {
-  if (workflow.length === 0) {
-    return 0
-  }
+const buildAssets = (draft: AnalysisDraft): AiAsset[] =>
+  draft.automationCandidates.map((candidate) => ({
+    id: `asset-${candidate.stepId}`,
+    name: candidate.label,
+    assetType: candidate.opportunity === 'default-automation' ? 'agent-flow' : 'skill',
+    description: candidate.rationale,
+    source: 'filesystem',
+    readiness: candidate.opportunity === 'assist-only' ? 'available' : 'partial',
+  }))
 
-  const totalScore = workflow.reduce((sum, step) => {
-    const fields = [
-      step.name.trim().length > 0,
-      step.owner.trim().length > 0,
-      step.input.trim().length > 0,
-      step.output.trim().length > 0,
-      step.tools.length > 0,
-      step.effortHours > 0,
-      step.throughputContribution > 0,
-    ]
-    return sum + fields.filter(Boolean).length / fields.length
-  }, 0)
-
-  return pct(totalScore / workflow.length)
-}
-
-const getOrganizationReadiness = (contextScore: number, workflow: WorkflowStep[]): number => {
-  if (workflow.length === 0) {
-    return contextScore
-  }
-  const governedSteps = workflow.filter(
-    (step) => step.reviewRequired || step.errorSensitivity === 'high',
-  ).length
-  const governanceCoverage = governedSteps / workflow.length
-  return Math.round(contextScore * 0.55 + pct(governanceCoverage) * 0.45)
-}
-
-const getInterfaceReadiness = (
-  attachedArtifacts: ImportedArtifact[],
-  totalAssets: number,
-): number => {
-  const distinctSources = new Set(attachedArtifacts.map((artifact) => artifact.source)).size
-  const sourceCoverage = distinctSources / 3
-  const assetCoverage = totalAssets === 0 ? 0 : attachedArtifacts.length / totalAssets
-  return Math.round(clamp(sourceCoverage * 70 + assetCoverage * 30, 0, 100))
-}
-
-const formatMetricDelta = (next: number, baseline: number, inverse = false): string => {
-  const diff = next - baseline
-  if (diff === 0) {
-    return 'flat'
-  }
-  const normalized = baseline === 0 ? 0 : Math.abs((diff / baseline) * 100)
-  const directionIsPositive = inverse ? diff <= 0 : diff >= 0
-  return `${directionIsPositive ? 'improves' : 'worsens'} ${normalized.toFixed(0)}%`
-}
-
-const buildNormalizationResults = (
-  artifacts: ImportedArtifact[],
-): ArtifactNormalizationResult[] =>
-  artifacts.map((artifact) => {
-    const normalizedFields = Object.entries(artifact.payload)
-      .filter(([key, value]) => {
-        if (key === 'raw') {
-          return false
-        }
-        if (typeof value === 'string') {
-          return value.trim().length > 0
-        }
-        if (Array.isArray(value)) {
-          return value.length > 0
-        }
-        if (typeof value === 'object' && value !== null) {
-          return Object.keys(value).length > 0
-        }
-        return Boolean(value)
-      })
-      .map(([key]) => key)
-
-    const gaps = expectedPayloadFields[artifact.source].filter(
-      (field) => !normalizedFields.includes(field),
-    )
-    const warnings: string[] = []
-
-    if (artifact.summary.length < 36) {
-      warnings.push('Summary is thin and may need human context.')
-    }
-    if (artifact.source === 'tracker' && gaps.includes('status')) {
-      warnings.push('Execution status is missing from the tracker artifact.')
-    }
-    if (artifact.source === 'filesystem' && gaps.includes('path')) {
-      warnings.push('Source path is missing, reducing traceability.')
-    }
-    if (artifact.source === 'docs' && gaps.includes('url')) {
-      warnings.push('Document source URL is missing.')
-    }
-
-    const status =
-      gaps.length === 0
-        ? 'ready'
-        : normalizedFields.length >= 2
-          ? 'needs-review'
-          : 'failed'
-
-    return {
-      artifactId: artifact.id,
-      status,
-      normalizedFields,
-      warnings,
-      gaps,
-    }
-  })
-
-const getStageStatus = (
-  stageId: StageId,
-  activeStage: StageId,
-  contextScore: number,
-  workflowReadiness: number,
-  attachedArtifactCount: number,
-): StudioStage['status'] => {
-  if (stageId === activeStage) {
-    return 'active'
-  }
-
-  if (stageId === 'context') {
-    return contextScore >= 80 ? 'complete' : 'pending'
-  }
-
-  if (stageId === 'workflow') {
-    return workflowReadiness >= 70 ? 'complete' : 'pending'
-  }
-
-  if (stageId === 'analysis') {
-    return attachedArtifactCount > 0 ? 'complete' : 'pending'
-  }
-
-  return activeStage === 'brief' ? 'active' : 'pending'
-}
-
-const getBottleneckDimension = (
-  workflowReadiness: number,
-  organizationReadiness: number,
-  interfaceReadiness: number,
-): string => {
-  if (workflowReadiness <= organizationReadiness && workflowReadiness <= interfaceReadiness) {
-    return 'Workflow readiness'
-  }
-  if (organizationReadiness <= interfaceReadiness) {
-    return 'Organization readiness'
-  }
-  return 'Interface readiness'
-}
-
-const getLeveragePoint = (workflow: WorkflowStep[]): string => {
-  if (workflow.length === 0) {
-    return 'No leverage point available'
-  }
-
-  const winner = [...workflow].sort((left, right) => {
-    const rightWeight = right.effortHours * right.throughputContribution
-    const leftWeight = left.effortHours * left.throughputContribution
-    return rightWeight - leftWeight
-  })[0]
-
-  return `${winner.name} owned by ${winner.owner}`
-}
-
-const getPilotSlice = (result: ScenarioMetricResult | null, workflow: WorkflowStep[]): string => {
-  if (!result) {
-    return 'No pilot slice selected'
-  }
-
-  const candidate = workflow.find((step) => {
-    const mode = result.selectedAutomation[step.id]
-    return mode === 'automate-with-review' || mode === 'automate-by-default'
-  })
-
-  if (!candidate) {
-    return 'Keep the current workflow intact and start with assist-only drafting.'
-  }
-
-  return `${candidate.name} with ${result.selectedAutomation[candidate.id]} controls`
-}
+const buildDiagnosis = (
+  draft: AnalysisDraft,
+  selectedResult: ScenarioMetricResult | null,
+): {
+  maturityStage: string
+  bottleneckDimension: string
+  leveragePoint: string
+  recommendedPilot: string
+} => ({
+  maturityStage: draft.reviewQueue.some((item) => item.confidence === 'low')
+    ? 'Evidence review in progress'
+    : 'Reviewed workflow ready',
+  bottleneckDimension: draft.bottlenecks[0] ?? 'No bottleneck identified',
+  leveragePoint: draft.automationCandidates[0]?.label ?? 'No leverage point selected',
+  recommendedPilot:
+    selectedResult?.strategy.title ?? 'Generate a draft to compare automation strategies',
+})
 
 export function useStudioState() {
-  const [organization, setOrganization] = useState(demoOrganization)
-  const [workflow, setWorkflow] = useState(demoWorkflow)
+  const { draft, status, generateDraft } = useAnalysisSession()
   const [activeStage, setActiveStage] = useState<StageId>('context')
-  const [selectedStrategyId, setSelectedStrategyId] = useState(demoSelectedStrategyId)
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(
-    initialArtifacts[0]?.id ?? null,
-  )
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(demoWorkflow[0]?.id ?? null)
-  const [attachedArtifactIds, setAttachedArtifactIds] = useState(initiallyAttachedArtifactIds)
-  const [strategyOverridesById, setStrategyOverridesById] = useState<StrategyOverrides>({})
-  const [generatedAt] = useState(() =>
-    new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date()),
-  )
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null)
+  const [analysisNotes, setAnalysisNotes] = useState('')
 
-  const attachedArtifacts = initialArtifacts.filter((artifact) =>
-    attachedArtifactIds.includes(artifact.id),
-  )
-  const selectedStep = workflow.find((step) => step.id === selectedStepId) ?? workflow[0] ?? null
-
-  const workflowContext: WorkflowContextBundle = {
-    organization,
-    workflow,
-    assets: demoAssets,
-    baseline: demoBaseline,
-    bottlenecks: demoBottlenecks,
-  }
-
-  const strategyResults = buildStrategyMetricsTable({
-    baseline: demoBaseline,
-    workflow,
-    strategies: demoStrategies,
-    overridesByStrategy: strategyOverridesById,
-  })
+  const currentDraft = draft
+  const visibleArtifacts = currentDraft?.artifacts ?? defaultDraft.artifacts
+  const strategies = currentDraft ? buildStrategies(currentDraft) : []
+  const strategyResults = currentDraft
+    ? buildStrategyMetricsTable({
+        baseline: currentDraft.baseline,
+        workflow: currentDraft.steps,
+        strategies,
+      })
+    : []
   const recommendedStrategyId = recommendStrategyId(strategyResults)
+  const resolvedStrategyId =
+    selectedStrategyId ?? recommendedStrategyId ?? strategyResults[0]?.strategy.id ?? null
   const selectedStrategyResult =
-    strategyResults.find((result) => result.strategy.id === selectedStrategyId) ??
-    strategyResults[0] ??
-    null
-  const recommendedStrategyResult =
-    strategyResults.find((result) => result.strategy.id === recommendedStrategyId) ?? null
+    strategyResults.find((result) => result.strategy.id === resolvedStrategyId) ?? null
+  const assets = currentDraft ? buildAssets(currentDraft) : buildAssets(defaultDraft)
+  const diagnosis = buildDiagnosis(currentDraft ?? defaultDraft, selectedStrategyResult)
 
-  const normalizationResults = buildNormalizationResults(initialArtifacts)
-  const contextScore = getContextScore(organization)
-  const workflowReadiness = getWorkflowReadiness(workflow)
-  const organizationReadiness = getOrganizationReadiness(contextScore, workflow)
-  const interfaceReadiness = getInterfaceReadiness(attachedArtifacts, demoAssets.length)
-  const businessLeverage = selectedStrategyResult?.metrics.leverage ?? 0
+  const briefMarkdown =
+    currentDraft && selectedStrategyResult
+      ? generateBriefMarkdown({
+          workflowContext: {
+            organization: defaultOrganization,
+            workflow: currentDraft.steps,
+            assets,
+            baseline: currentDraft.baseline,
+            bottlenecks: currentDraft.bottlenecks,
+          },
+          importedArtifacts: currentDraft.artifacts,
+          strategyResults: strategyResults.map((result) => ({
+            scenario: result.strategy,
+            metrics: result.metrics,
+            automationCoverage: result.automationCoverage,
+          })),
+          selectedStrategyId: resolvedStrategyId ?? selectedStrategyResult.strategy.id,
+        })
+      : ''
 
-  const stages: StudioStage[] = [
-    {
-      id: 'context',
-      label: 'Context',
-      description: 'Capture the operating context and import MCP evidence.',
-      status: getStageStatus(
-        'context',
-        activeStage,
-        contextScore,
-        workflowReadiness,
-        attachedArtifacts.length,
-      ),
-    },
-    {
-      id: 'workflow',
-      label: 'Workflow',
-      description: 'Map the current process, owners, and review gates.',
-      status: getStageStatus(
-        'workflow',
-        activeStage,
-        contextScore,
-        workflowReadiness,
-        attachedArtifacts.length,
-      ),
-    },
-    {
-      id: 'analysis',
-      label: 'Simulation',
-      description: 'Compare strategies, controls, and leverage tradeoffs.',
-      status: getStageStatus(
-        'analysis',
-        activeStage,
-        contextScore,
-        workflowReadiness,
-        attachedArtifacts.length,
-      ),
-    },
-    {
-      id: 'brief',
-      label: 'Brief',
-      description: 'Produce a shareable recommendation and roadmap.',
-      status: getStageStatus(
-        'brief',
-        activeStage,
-        contextScore,
-        workflowReadiness,
-        attachedArtifacts.length,
-      ),
-    },
-  ]
+  const stages: StudioStage[] = stageOrder.map((stageId) => {
+    const labels: Record<StageId, { label: string; description: string }> = {
+      context: {
+        label: 'Evidence',
+        description: 'Load repo docs, tracker exports, and review notes.',
+      },
+      workflow: {
+        label: 'Review',
+        description: 'Confirm the drafted workflow, bottlenecks, and review gates.',
+      },
+      analysis: {
+        label: 'Scenarios',
+        description: 'Compare copilot, hybrid, and agentic options.',
+      },
+      brief: {
+        label: 'Brief',
+        description: 'Export a shareable recommendation and roadmap.',
+      },
+    }
+
+    const activeIndex = stageOrder.indexOf(activeStage)
+    const stageIndex = stageOrder.indexOf(stageId)
+    const statusLabel =
+      stageId === activeStage
+        ? 'active'
+        : stageIndex < activeIndex
+          ? 'complete'
+          : stageId !== 'context' && !currentDraft
+            ? 'pending'
+            : 'pending'
+
+    return {
+      id: stageId,
+      label: labels[stageId].label,
+      description: labels[stageId].description,
+      status: statusLabel,
+    }
+  })
 
   const heroStats: HeroStat[] = [
     {
-      id: 'workflow-readiness',
-      label: 'Workflow Readiness',
-      value: `${workflowReadiness}%`,
-      delta: `${workflow.length} modeled steps`,
-      tone: workflowReadiness >= 75 ? 'positive' : 'warning',
+      id: 'story-points',
+      label: 'Story Points',
+      value: currentDraft?.storyPoints ?? defaultDraft.storyPoints,
+      delta: `${visibleArtifacts.length} evidence artifacts`,
+      tone: 'warning',
     },
     {
-      id: 'org-readiness',
-      label: 'Organization Readiness',
-      value: `${organizationReadiness}%`,
-      delta: `${workflow.filter((step) => step.reviewRequired).length} review gates`,
-      tone: organizationReadiness >= 75 ? 'positive' : 'warning',
+      id: 'review-items',
+      label: 'Review Queue',
+      value: currentDraft?.reviewQueue.length ?? defaultDraft.reviewQueue.length,
+      delta: `${(currentDraft ?? defaultDraft).reviewQueue.filter((item) => item.confidence === 'low').length} low-confidence items`,
+      tone: 'risk',
     },
     {
-      id: 'interface-readiness',
-      label: 'Interface Readiness',
-      value: `${interfaceReadiness}%`,
-      delta: `${attachedArtifacts.length} MCP artifacts attached`,
-      tone: interfaceReadiness >= 70 ? 'positive' : 'warning',
+      id: 'cycle-point',
+      label: 'Cycle / Point',
+      value: selectedStrategyResult?.metrics.cycleTimePerStoryPoint ?? 'pending',
+      delta: selectedStrategyResult ? selectedStrategyResult.strategy.title : 'Generate a draft',
+      tone: 'positive',
     },
     {
-      id: 'business-leverage',
-      label: 'Output-Input Leverage',
-      value: businessLeverage,
-      delta:
-        selectedStrategyResult === null
-          ? 'No strategy selected'
-          : formatMetricDelta(
-              selectedStrategyResult.metrics.leverage,
-              demoBaseline.outputVolume /
-                Math.max(1, demoBaseline.humanEffortHours + demoBaseline.reviewBurdenHours),
-            ),
-      tone: businessLeverage >= 0.28 ? 'positive' : 'risk',
-    },
-    {
-      id: 'recommended-path',
-      label: 'Recommended Path',
-      value: recommendedStrategyResult?.strategy.title ?? 'Unavailable',
-      delta:
-        recommendedStrategyResult === null
-          ? undefined
-          : formatMetricDelta(
-              recommendedStrategyResult.metrics.cycleTime,
-              demoBaseline.cycleTimeHours,
-              true,
-            ),
+      id: 'cost-point',
+      label: 'Cost / Point',
+      value:
+        selectedStrategyResult?.metrics.estimatedCostPerStoryPoint === undefined
+          ? 'pending'
+          : `$${selectedStrategyResult.metrics.estimatedCostPerStoryPoint}`,
+      delta: currentDraft ? 'Scenario-normalized estimate' : 'Needs draft workflow',
       tone: 'neutral',
     },
   ]
 
-  const briefMarkdown = generateBriefMarkdown({
-    workflowContext,
-    importedArtifacts: attachedArtifacts,
-    strategyResults: strategyResults.map((result) => ({
-      scenario: result.strategy,
-      metrics: result.metrics,
-      automationCoverage: result.automationCoverage,
-    })),
-    selectedStrategyId: selectedStrategyResult?.strategy.id ?? demoSelectedStrategyId,
-    generatedAt,
-  })
+  const generateDraftFromEvidence = async (input: EvidenceDraftInput) => {
+    setAnalysisNotes(input.notes)
 
-  const diagnosis = {
-    maturityStage:
-      workflowReadiness >= 80 && interfaceReadiness >= 70
-        ? 'Workflow-visible, AI-calibrating'
-        : 'Workflow partly explicit, controls still forming',
-    bottleneckDimension: getBottleneckDimension(
-      workflowReadiness,
-      organizationReadiness,
-      interfaceReadiness,
-    ),
-    leveragePoint: getLeveragePoint(workflow),
-    recommendedPilot: getPilotSlice(selectedStrategyResult, workflow),
-  }
-
-  const moveToStage = (direction: 'next' | 'previous') => {
-    const index = stageOrder.indexOf(activeStage)
-    const nextIndex =
-      direction === 'next'
-        ? clamp(index + 1, 0, stageOrder.length - 1)
-        : clamp(index - 1, 0, stageOrder.length - 1)
-    setActiveStage(stageOrder[nextIndex])
-  }
-
-  const importSelectedArtifact = (artifactId: string) => {
-    setAttachedArtifactIds((current) =>
-      current.includes(artifactId) ? current : [...current, artifactId],
-    )
-  }
-
-  const updateSelectedStrategyStepMode = (stepId: string, mode: AutomationMode) => {
-    setStrategyOverridesById((current) => ({
-      ...current,
-      [selectedStrategyId]: {
-        ...current[selectedStrategyId],
-        [stepId]: mode,
-      },
+    const artifacts = defaultDraft.artifacts.map((artifact) => ({
+      id: artifact.id,
+      type: artifact.artifactType,
+      title: artifact.title,
+      content: artifact.rawText,
     }))
+
+    if (input.notes.trim().length > 0) {
+      artifacts.push({
+        id: 'artifact-pasted-note',
+        type: 'pasted-note',
+        title: 'Pasted Notes',
+        content: input.notes.trim(),
+      })
+    }
+
+    await generateDraft({
+      workflowName: input.workflowName,
+      artifacts,
+    })
+
+    setActiveStage('workflow')
+    setSelectedStrategyId(null)
+  }
+
+  const moveToNextStage = () => {
+    const currentIndex = stageOrder.indexOf(activeStage)
+    if (currentIndex === -1 || currentIndex === stageOrder.length - 1) {
+      return
+    }
+    if (!currentDraft && currentIndex >= 0) {
+      return
+    }
+    setActiveStage(stageOrder[currentIndex + 1])
+  }
+
+  const moveToPreviousStage = () => {
+    const currentIndex = stageOrder.indexOf(activeStage)
+    if (currentIndex <= 0) {
+      return
+    }
+    setActiveStage(stageOrder[currentIndex - 1])
   }
 
   return {
     activeStage,
-    setActiveStage,
-    stages,
-    heroStats,
-    organization,
-    setOrganization,
-    workflow,
-    setWorkflow,
-    workflowContext,
-    baseline: demoBaseline,
-    assets: demoAssets,
-    bottlenecks: demoBottlenecks,
-    availableArtifacts: initialArtifacts,
-    attachedArtifacts,
-    selectedArtifactId,
-    setSelectedArtifactId,
-    normalizationResults,
-    importSelectedArtifact,
-    selectedStepId,
-    setSelectedStepId,
-    selectedStep,
-    strategyResults,
-    selectedStrategyId,
-    setSelectedStrategyId,
-    selectedStrategyResult,
-    recommendedStrategyId,
-    recommendedStrategyResult,
-    updateSelectedStrategyStepMode,
+    analysisNotes,
+    analysisStatus: status,
+    artifacts: visibleArtifacts,
+    assets,
+    attachedArtifacts: currentDraft?.artifacts ?? [],
+    baseline: currentDraft?.baseline ?? defaultDraft.baseline,
+    bottlenecks: currentDraft?.bottlenecks ?? defaultDraft.bottlenecks,
     briefMarkdown,
+    canMoveNext: Boolean(currentDraft) && activeStage !== 'brief',
+    canMovePrevious: activeStage !== 'context',
+    currentDraft,
     diagnosis,
-    contextScore,
-    workflowReadiness,
-    organizationReadiness,
-    interfaceReadiness,
-    moveToNextStage: () => moveToStage('next'),
-    moveToPreviousStage: () => moveToStage('previous'),
+    generateDraft: generateDraftFromEvidence,
+    heroStats,
+    moveToNextStage,
+    moveToPreviousStage,
+    recommendedStrategyId,
+    reviewQueue: currentDraft?.reviewQueue ?? defaultDraft.reviewQueue,
+    selectedStrategyId: resolvedStrategyId ?? '',
+    selectedStrategyResult,
+    setActiveStage,
+    setSelectedStrategyId,
+    stages,
+    strategyResults,
+    traceLinks: currentDraft?.traceLinks ?? defaultDraft.traceLinks,
   }
 }

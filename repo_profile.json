@@ -1,13 +1,13 @@
 {
   "agent": "codex",
   "language": "javascript",
-  "test_cmd": "npm run build",
-  "test_focused_cmd": "npm run build",
+  "test_cmd": "npm run test",
+  "test_focused_cmd": "npm run test",
   "lint_cmd": "npm run lint",
-  "typecheck_cmd": "npx tsc --noEmit -p tsconfig.app.json",
+  "typecheck_cmd": "npm run typecheck",
   "build_cmd": "npm run build",
   "docker_image": null,
-  "skip_evaluator": true,
+  "skip_evaluator": false,
   "codex_flags": "--full-auto",
   "evaluation_criteria": {
     "feature_completeness": {
