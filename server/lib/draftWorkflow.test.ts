@@ -22,4 +22,22 @@ describe('draftWorkflowFromEvidence', () => {
     )
     expect(result.edges.some((edge) => edge.type === 'rework-loop')).toBe(true)
   })
+
+  it('preserves zero-valued story points from evidence', () => {
+    const result = draftWorkflowFromEvidence({
+      workflowName: 'Maintenance chore',
+      artifacts: [
+        {
+          id: 'jira-2',
+          type: 'tracker-export',
+          title: 'PLAT-9',
+          content: 'Story: rotate secrets. Story Points: 0. Validation: run lint and tests.',
+        },
+      ],
+    })
+
+    expect(result.storyPoints).toBe(0)
+    expect(result.baseline.storyPoints).toBe(0)
+    expect(result.steps.every((step) => step.storyPoints === 0)).toBe(true)
+  })
 })

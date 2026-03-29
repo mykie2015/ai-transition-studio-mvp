@@ -62,7 +62,9 @@ export function draftWorkflowFromEvidence(input: AnalysisDraftRequest): Analysis
   const baseDraft = buildDefaultAgileWorkflow()
   const artifacts = normalizeArtifacts(input.artifacts)
   const inferredStoryPoints =
-    input.artifacts.map((artifact) => extractStoryPoints(artifact.content)).find(Boolean) ?? 3
+    input.artifacts
+      .map((artifact) => extractStoryPoints(artifact.content))
+      .find((value): value is number => value !== undefined) ?? 3
 
   const steps = baseDraft.steps.map((step: WorkflowStep) => ({
     ...step,
