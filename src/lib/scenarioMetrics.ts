@@ -173,6 +173,22 @@ export const calculateScenarioMetrics = ({
         reviewBurden: baseline.reviewBurdenHours,
         qualityRisk: round(clamp(100 - baseline.qualityScore, 1, 99)),
         leverage: round(baselineLeverage(baseline)),
+        cycleTimePerStoryPoint:
+          baseline.storyPoints === undefined
+            ? undefined
+            : round(baseline.cycleTimeHours / Math.max(1, baseline.storyPoints)),
+        humanEffortPerStoryPoint:
+          baseline.storyPoints === undefined
+            ? undefined
+            : round(baseline.humanEffortHours / Math.max(1, baseline.storyPoints)),
+        estimatedCostPerStoryPoint:
+          baseline.storyPoints === undefined || baseline.costPerHourUsd === undefined
+            ? undefined
+            : round(
+                ((baseline.humanEffortHours + baseline.reviewBurdenHours) *
+                  baseline.costPerHourUsd) /
+                  Math.max(1, baseline.storyPoints),
+              ),
       },
       assumptions: [
         'No workflow steps were provided; scenario remains at baseline metrics.',
@@ -253,6 +269,10 @@ export const calculateScenarioMetrics = ({
   const effectiveOutput = projectedOutput * qualityConfidence
   const effectiveInput = humanEffort + reviewBurden * 0.75 + cycleTime * 0.15
   const leverage = round(clamp(effectiveOutput / Math.max(1, effectiveInput), 0.2, 12))
+  const storySize = Math.max(1, baseline.storyPoints ?? 0)
+  const costPerHour = baseline.costPerHourUsd ?? 0
+  const estimatedCost =
+    costPerHour === 0 ? undefined : (humanEffort + reviewBurden) * costPerHour
 
   const assumptions = [
     `${strategy.title} applies ${round(automationCoverage * 100)}% weighted automation coverage.`,
@@ -270,6 +290,10 @@ export const calculateScenarioMetrics = ({
       reviewBurden,
       qualityRisk,
       leverage,
+      cycleTimePerStoryPoint: round(cycleTime / storySize),
+      humanEffortPerStoryPoint: round(humanEffort / storySize),
+      estimatedCostPerStoryPoint:
+        estimatedCost === undefined ? undefined : round(estimatedCost / storySize),
     },
     assumptions,
   }

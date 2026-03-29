@@ -1,6 +1,6 @@
 .app-shell {
   margin: 0 auto;
-  max-width: 1480px;
+  max-width: 1600px;
   padding: 28px;
 }
 
@@ -9,29 +9,37 @@
 .app-listStack,
 .app-metricList {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
+}
+
+.app-detailBand {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
 }
 
 .app-introCard,
 .app-sideCard {
   background: #ffffff;
   border: 1px solid #d7dfed;
-  border-radius: 14px;
-  padding: 1rem;
+  border-radius: 20px;
+  box-shadow: 0 18px 38px rgba(20, 32, 51, 0.06);
+  padding: 1.1rem;
 }
 
 .app-introCard h2,
 .app-sideCard h3 {
   color: #18263d;
   font-size: 1.15rem;
+  margin: 0;
 }
 
 .app-introCard p,
 .app-sideCard p {
   color: #50627d;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  margin-top: 0.35rem;
+  font-size: 0.92rem;
+  line-height: 1.58;
+  margin-top: 0.4rem;
 }
 
 .app-eyebrow,
@@ -48,17 +56,17 @@
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
-  margin-top: 0.95rem;
+  margin-top: 0.4rem;
 }
 
 .app-navButton {
   background: #173964;
   border: 1px solid #143158;
-  border-radius: 10px;
+  border-radius: 12px;
   color: #f2f8ff;
   font-size: 0.86rem;
   font-weight: 620;
-  padding: 0.62rem 0.9rem;
+  padding: 0.68rem 1rem;
 }
 
 .app-navSecondary {
@@ -74,6 +82,12 @@
   color: #607089;
   cursor: not-allowed;
   transform: none;
+}
+
+@media (max-width: 1100px) {
+  .app-detailBand {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 980px) {

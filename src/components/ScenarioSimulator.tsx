@@ -16,6 +16,9 @@ const metricLabelMap = {
   reviewBurden: 'Review Burden',
   qualityRisk: 'Quality Risk',
   leverage: 'Leverage',
+  cycleTimePerStoryPoint: 'Cycle / Point',
+  humanEffortPerStoryPoint: 'Effort / Point',
+  estimatedCostPerStoryPoint: 'Cost / Point',
 } as const
 
 const roundPct = (value: number): string => `${Math.round(value * 100)}%`
@@ -70,7 +73,7 @@ export default function ScenarioSimulator({
             <p className={styles.recommendationLabel}>Recommended First Move</p>
             <p className={styles.recommendationValue}>{recommended.strategy.title}</p>
             <p className={styles.recommendationBody}>
-              Highest leverage under the current workflow and MCP coverage assumptions.
+              Highest leverage under the current workflow and evidence-backed coverage assumptions.
             </p>
           </div>
         ) : null}
@@ -101,6 +104,10 @@ export default function ScenarioSimulator({
                   <p className={styles.metricValue}>{roundPct(result.automationCoverage)}</p>
                 </div>
                 {Object.entries(result.metrics).map(([metric, value]) => {
+                  if (value === undefined) {
+                    return null
+                  }
+
                   const baselineValue =
                     metric === 'cycleTime'
                       ? baseline.cycleTimeHours
@@ -110,6 +117,14 @@ export default function ScenarioSimulator({
                           ? baseline.reviewBurdenHours
                           : metric === 'qualityRisk'
                             ? 100 - baseline.qualityScore
+                            : metric === 'cycleTimePerStoryPoint'
+                              ? baseline.cycleTimeHours / Math.max(1, baseline.storyPoints ?? 1)
+                              : metric === 'humanEffortPerStoryPoint'
+                                ? baseline.humanEffortHours / Math.max(1, baseline.storyPoints ?? 1)
+                                : metric === 'estimatedCostPerStoryPoint'
+                                  ? ((baseline.humanEffortHours + baseline.reviewBurdenHours) *
+                                      (baseline.costPerHourUsd ?? 0)) /
+                                    Math.max(1, baseline.storyPoints ?? 1)
                             : baseline.outputVolume /
                               Math.max(
                                 1,
@@ -121,7 +136,9 @@ export default function ScenarioSimulator({
                       <p className={styles.metricLabel}>
                         {metricLabelMap[metric as keyof typeof metricLabelMap]}
                       </p>
-                      <p className={styles.metricValue}>{value}</p>
+                      <p className={styles.metricValue}>
+                        {metric === 'estimatedCostPerStoryPoint' ? `$${value}` : value}
+                      </p>
                       <p className={styles.metricDelta}>
                         {deltaLabel(value, baselineValue, metric !== 'leverage')}
                       </p>

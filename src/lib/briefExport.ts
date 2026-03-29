@@ -65,7 +65,7 @@ const roadmapByMode = (
       days0to30: [
         'Split the workflow into human-governed and AI-managed subflows.',
         'Define review gates for high-sensitivity outputs.',
-        'Wire MCP imports for filesystem, docs, and tracker context.',
+        'Standardize evidence intake for repo files, tracker exports, and tool manifests.',
       ],
       days31to60: [
         'Automate recurring transformation steps with structured outputs.',
@@ -99,7 +99,15 @@ const roadmapByMode = (
   }
 }
 
-const sourceOrder: ImportedArtifact['source'][] = ['filesystem', 'docs', 'tracker']
+const sourceOrder: ImportedArtifact['source'][] = [
+  'filesystem',
+  'docs',
+  'tracker',
+  'tool-manifest',
+  'validation',
+  'review',
+  'note',
+]
 
 const summarizeImports = (artifacts: ImportedArtifact[]): string[] => {
   const lines: string[] = []
@@ -116,7 +124,7 @@ const summarizeImports = (artifacts: ImportedArtifact[]): string[] => {
     }
   }
   if (lines.length === 0) {
-    return ['- No MCP artifacts were imported for this session.']
+    return ['- No evidence artifacts were imported for this session.']
   }
   return lines
 }
@@ -207,6 +215,9 @@ ${comparisonTableLines.join('\n')}
 - Review burden: ${selectedKpis.reviewBurden}h
 - Quality risk: ${selectedKpis.qualityRisk}
 - Output-input leverage: ${selectedKpis.leverage}
+${selectedKpis.cycleTimePerStoryPoint !== undefined ? `- Cycle time per story point: ${selectedKpis.cycleTimePerStoryPoint}h` : ''}
+${selectedKpis.humanEffortPerStoryPoint !== undefined ? `- Human effort per story point: ${selectedKpis.humanEffortPerStoryPoint}h` : ''}
+${selectedKpis.estimatedCostPerStoryPoint !== undefined ? `- Estimated cost per story point: $${selectedKpis.estimatedCostPerStoryPoint}` : ''}
 
 ## Risk Notes
 ${riskNotes.map((note) => `- ${note}`).join('\n')}
@@ -224,7 +235,7 @@ ${roadmap.days31to60.map((item) => `- ${item}`).join('\n')}
 ### 61-90 Days
 ${roadmap.days61to90.map((item) => `- ${item}`).join('\n')}
 
-## MCP Context Used
+## Evidence Used
 ${summarizeImports(importedArtifacts).join('\n')}
 `
 }

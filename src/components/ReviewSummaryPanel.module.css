@@ -1,0 +1,60 @@
+.panel {
+  background: #ffffff;
+  border: 1px solid #d8e1ec;
+  border-radius: 22px;
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.eyebrow,
+.label {
+  color: #6b7280;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.title,
+.body,
+.meta {
+  margin: 0;
+}
+
+.title {
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-size: 1.2rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.card {
+  background: #f8fafc;
+  border: 1px solid #d8e1ec;
+  border-radius: 18px;
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.95rem;
+}
+
+.body {
+  color: #12243c;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.meta {
+  color: #546275;
+  line-height: 1.55;
+}

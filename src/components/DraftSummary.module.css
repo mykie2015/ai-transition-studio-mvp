@@ -1,0 +1,25 @@
+.panel {
+  background: linear-gradient(135deg, #fff8ef, #fffdf8);
+  border: 1px solid #f0d6b8;
+  border-radius: 18px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  padding: 1rem;
+}
+
+.metric {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.label {
+  color: #7c5a35;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.value {
+  color: #1e293b;
+  font-size: 1.2rem;
+}

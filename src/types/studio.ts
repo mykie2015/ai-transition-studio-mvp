@@ -11,7 +11,33 @@ export type StrategyMode = 'copilot' | 'hybrid' | 'agentic'
 
 export type ErrorSensitivity = 'low' | 'medium' | 'high'
 
-export type ArtifactSource = 'filesystem' | 'docs' | 'tracker'
+export type ArtifactSource =
+  | 'filesystem'
+  | 'docs'
+  | 'tracker'
+  | 'tool-manifest'
+  | 'validation'
+  | 'review'
+  | 'note'
+
+export type EvidenceArtifactType =
+  | 'repo-doc'
+  | 'tracker-export'
+  | 'tool-manifest'
+  | 'validation-artifact'
+  | 'review-artifact'
+  | 'pasted-note'
+
+export type WorkflowEdgeType =
+  | 'handoff'
+  | 'branch'
+  | 'feedback-loop'
+  | 'rework-loop'
+  | 'escalation'
+
+export type ConfirmationState = 'drafted' | 'reviewed' | 'edited'
+
+export type ReviewConfidence = 'low' | 'medium' | 'high'
 
 export type StageId = 'context' | 'workflow' | 'analysis' | 'brief'
 
@@ -30,19 +56,22 @@ export interface WorkflowStep {
   owner: string
   input: string
   output: string
+  storyPoints?: number
   tools: string[]
   automationMode: AutomationMode
   errorSensitivity: ErrorSensitivity
   reviewRequired: boolean
+  validationRequired?: boolean
   effortHours: number
   throughputContribution: number
   notes: string
+  confirmationState?: ConfirmationState
 }
 
 export interface AiAsset {
   id: string
   name: string
-  assetType: 'skill' | 'mcp' | 'prompt' | 'agent-flow' | 'rag' | 'api'
+  assetType: 'skill' | 'tool' | 'prompt' | 'agent-flow' | 'rag' | 'api'
   description: string
   source: ArtifactSource
   readiness: 'available' | 'partial' | 'blocked'
@@ -54,6 +83,8 @@ export interface BaselineMetrics {
   outputVolume: number
   qualityScore: number
   reviewBurdenHours: number
+  storyPoints?: number
+  costPerHourUsd?: number
 }
 
 export interface MetricSet {
@@ -62,6 +93,9 @@ export interface MetricSet {
   reviewBurden: number
   qualityRisk: number
   leverage: number
+  cycleTimePerStoryPoint?: number
+  humanEffortPerStoryPoint?: number
+  estimatedCostPerStoryPoint?: number
 }
 
 export interface StrategyProjection extends MetricSet {
@@ -91,6 +125,58 @@ export interface ImportedArtifact {
   title: string
   summary: string
   payload: Record<string, unknown>
+}
+
+export interface EvidenceArtifact extends ImportedArtifact {
+  artifactType: EvidenceArtifactType
+  rawText: string
+  extractionStatus: 'ready' | 'needs-review' | 'failed'
+  warnings: string[]
+}
+
+export interface TraceLink {
+  artifactId: string
+  artifactTitle: string
+  excerpt: string
+  inferredField: string
+  confidence: ReviewConfidence
+}
+
+export interface WorkflowEdge {
+  id: string
+  sourceStepId: string
+  targetStepId: string
+  type: WorkflowEdgeType
+  label: string
+}
+
+export interface ReviewItem {
+  id: string
+  label: string
+  field: string
+  stepId?: string
+  confidence: ReviewConfidence
+  reason: string
+}
+
+export interface AutomationCandidate {
+  stepId: string
+  label: string
+  opportunity: 'assist-only' | 'review-gated' | 'default-automation'
+  rationale: string
+}
+
+export interface AnalysisDraft {
+  workflowName: string
+  storyPoints: number
+  steps: WorkflowStep[]
+  edges: WorkflowEdge[]
+  artifacts: EvidenceArtifact[]
+  reviewQueue: ReviewItem[]
+  bottlenecks: string[]
+  automationCandidates: AutomationCandidate[]
+  traceLinks: Record<string, TraceLink[]>
+  baseline: BaselineMetrics
 }
 
 export interface WorkflowContextBundle {
